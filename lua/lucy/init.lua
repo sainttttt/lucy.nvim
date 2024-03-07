@@ -5,10 +5,18 @@ local marks = {}
 local api = vim.api
 local augroup = vim.api.nvim_create_augroup   -- Create/get autocommand group
 local autocmd = vim.api.nvim_create_autocmd   -- Create autocommand
+local om = require('orderedmap')
 
 -- local filename = ""
 
 local ns_id = vim.api.nvim_create_namespace('HighlightLineNamespace')
+
+function swallow_output(callback, ...)
+  local old_print = print
+  print = function(...) end
+  pcall(callback, arg)
+  print = old_print
+end
 
 
 function firstNonWhitespace(str)
@@ -64,11 +72,11 @@ M.toggleMark = function()
 
   local line_nr = pos[2]
 
-  if marks[filename] == nil then
-    marks[filename] = {extmarks = {}}
-  end
 
-  print(dump(marks[filename]))
+  local file_entry = {extmarks = {}}
+
+  om.add(marks, filename, file_entry)
+  print("added file", dump(marks[filename]))
 
   local marks_section = getMarkSection(filename)
 
@@ -225,6 +233,7 @@ end
 M.jumpToNextMark = function(backwards)
   local filename = vim.fn.expand('%')
 
+  print('reading marks')
   if next(marks) == nil then
     M.readFile()
   end
@@ -264,18 +273,21 @@ M.jumpToNextMark = function(backwards)
   end
 
   if jump == -1 then
-    jump = pos[2]
-    local next_file = nil
 
-    -- find previous file in list
-    -- (seems like we have to loop to get this )
-    if backwards then
-      next_file = getPrevIndex(marks, filename) or getLastItem(marks)
+    -- stay at last position if we reach the end
+    jump = pos[2]
+
+    -- or jump to next file
+    local next_file  = nil
+    if filename == nil or filename == "" then
+      next_file = (backwards and {om.last(marks)}
+                             or {om.first(marks)})[1]
     else
-      next_file = next(marks, filename) or next(marks, nil)
+      next_file = (backwards and {om.prev(marks, filename)}
+                             or {om.next(marks, filename)})[1]
     end
 
-    print('loop next', next_file)
+    print('next file', next_file)
 
     vim.cmd('e ' .. next_file)
 
@@ -291,6 +303,7 @@ M.jumpToNextMark = function(backwards)
 end
 
 
+
 M.setup = function()
   vim.keymap.set('n', '<leader><leader>', function() M.toggleMark() end)
   vim.keymap.set('n', '<leader>ba', function() M.listMarks() end)
@@ -303,25 +316,23 @@ M.setup = function()
   autocmd('BufReadPost', {
     group = 'LucyAutoCmds',
     callback = function()
-      M.drawMarks()
+      swallow_output(M.drawMarks)
     end
   })
 
   autocmd({"TextChanged", "TextChangedI"}, {
     group = 'LucyAutoCmds',
     callback = function()
-      M.updateMarksFromExt()
+      swallow_output(M.updateMarksFromExt)
     end
   })
 
   autocmd({"BufWritePost"}, {
     group = 'LucyAutoCmds',
     callback = function()
-      M.writeFile()
+      swallow_output(M.writeFile)
     end
   })
 end
-
-
 
 return M
