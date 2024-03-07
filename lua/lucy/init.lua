@@ -52,6 +52,11 @@ local delHighlight = function(lineNr, filename)
 end
 
 local getMarkSection = function(filename)
+
+  if marks[filename] == nil then
+    return nil
+  end
+
   local marks_section = marks[filename]['extmarks']
   if marks[filename]['mod_extmarks'] ~= nil then
     marks_section = marks[filename]['mod_extmarks']
@@ -92,7 +97,6 @@ M.toggleMark = function()
 
   if marks_section[line_nr] ~= nil then
     print('deleting')
-    print(dump(marks))
 
     vim.api.nvim_buf_del_extmark(0, ns_id, marks_section[line_nr])
     marks_section[line_nr] = nil
@@ -103,7 +107,6 @@ M.toggleMark = function()
 
   else
     print('adding')
-    print(dump(marks))
     addMark(pos[2], filename, marks_section)
   end
 
@@ -123,7 +126,6 @@ M.drawMarks = function()
   end
 
   print('draw marks')
-  print(dump(marks))
   local marks_section = getMarkSection(filename)
 
   for k,v in pairs(marks_section) do
@@ -145,8 +147,6 @@ M.updateMarksFromExt = function()
   local filename = vim.fn.expand('%')
   if marks[filename] == nil then return end
 
-  print('wwoooofa2')
-  print(filename)
   if filename == {}
     or filename == nil
     or filename == ""
@@ -157,8 +157,6 @@ M.updateMarksFromExt = function()
   then
     return
   end
-
-  print('wwoooofa')
 
   if api.nvim_buf_get_option(0, 'modified') then
     if marks[filename]['mod_extmarks'] == nil then
@@ -174,7 +172,6 @@ M.updateMarksFromExt = function()
     for k, v in pairs(all) do
       marks[filename]['mod_extmarks'][v[2] + 1] = v[1]
     end
-    print(dump(marks))
   else
     -- remove file from mod lists if it is not modded anymore
     marks[filename]['mod_extmarks'] = nil
@@ -187,12 +184,7 @@ M.updateMarksFromExt = function()
     --   marks['mod_orderlist'] = nil
     -- end
 
-    print(' 22 updated marks state:')
-    print(dump(marks))
   end
-
-  print('updated marks state:')
-  print(dump(marks))
 
 
   M.clearAllMarks(filename)
@@ -280,17 +272,20 @@ function getLastItem(tbl)
   return last
 end
 
-M.jumpToNextMark = function(backwards, calling_filename, loop_count)
-  local filename = vim.fn.expand('%')
-
-  if calling_filename == filename then
-    if loop_count < 2 then
-      loop_count = loop_count + 1
-    else
-      return
-    end
+local getNextFile = function(backwards, filename)
+  local next_file  = nil
+  if filename == nil or filename == "" then
+    next_file = (backwards and {om.last(marks)}
+    or {om.first(marks)})[1]
+  else
+    next_file = (backwards and {om.prev(marks, filename)}
+    or {om.next(marks, filename)})[1]
   end
+  return next_file
+end
 
+M.jumpToNextMark = function(backwards)
+  local filename = vim.fn.expand('%')
 
   print('reading marks')
   if next(marks) == nil then
@@ -299,26 +294,27 @@ M.jumpToNextMark = function(backwards, calling_filename, loop_count)
 
   print(dump(marks))
 
-  -- jump to first file
+  -- jump to first file from splash
   if filename == '' or filename == nil then
     local next_file = next(marks, nil)
+    if next_file == nil then return end
     vim.cmd('e ' .. next_file)
     if backwards then
       vim.cmd('normal! G')
     else
       vim.cmd('normal! gg')
     end
-    M.jumpToNextMark(backwards, calling_filename)
+    M.jumpToNextMark(backwards)
     return
   end
 
   local marks_section = getMarkSection(filename)
-  print("here", filename)
-  print(dump(marks_section))
+  if marks_section == nil then return end
 
   local pos = vim.fn.getpos('.')
   local jump = -1
 
+  -- find line to jump to
   for k,v in pairs(marks_section) do
     if backwards then
       if k < pos[2] and (jump == -1 or k > jump) then
@@ -331,32 +327,53 @@ M.jumpToNextMark = function(backwards, calling_filename, loop_count)
     end
   end
 
+  -- line not found
   if jump == -1 then
-
     -- stay at last position if we reach the end
     jump = pos[2]
 
     -- or jump to next file
-    local next_file  = nil
-    if filename == nil or filename == "" then
-      next_file = (backwards and {om.last(marks)}
-                             or {om.first(marks)})[1]
-    else
-      next_file = (backwards and {om.prev(marks, filename)}
-                             or {om.next(marks, filename)})[1]
+    local next_file = nil
+    while next_file ~= filename do
+      if next_file == nil then
+        next_file = filename
+      end
+      next_file = getNextFile(backwards, next_file)
+      print('loop next file ' .. next_file)
+
+      if next_file == nil then
+        return
+      end
+
+      local new_marks_section = getMarkSection(next_file)
+      print('new marks section')
+      print(dump(new_marks_section))
+
+      if next(new_marks_section) ~= nil then
+        break
+      end
+    end
+
+    -- prevent infinite loop
+    if next_file == filename then
+      return
     end
 
     print('next file', next_file)
 
     vim.cmd('e ' .. next_file)
-
     if backwards then
       vim.cmd('normal! G')
     else
       vim.cmd('normal! gg')
     end
 
-    M.jumpToNextMark(backwards, calling_filename, loop_count)
+    local new_marks_section = getMarkSection(next_file)
+    local pos = vim.fn.getpos('.')
+
+    if new_marks_section and new_marks_section[pos[2]] == nil then
+      M.jumpToNextMark(backwards)
+    end
     return
   end
   vim.cmd('normal! ' .. jump .. 'G')
@@ -364,7 +381,7 @@ end
 
 M.jump = function(backwards)
   local filename = vim.fn.expand('%')
-  M.jumpToNextMark(backwards, filename, 0)
+  M.jumpToNextMark(backwards)
 end
 
 
