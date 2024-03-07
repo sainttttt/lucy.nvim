@@ -13,6 +13,18 @@ M.add = function(map, k, v)
 	end
 end
 
+M.delValFromList = function(map, val)
+	local newList = {}
+
+	for k,v in pairs(map) do
+		if v ~= val then
+			table.insert(newOrderList, v)
+		end
+	end
+	return newList
+
+end
+
 M.del = function(map, k)
 	if map[k] == nil then
 		return

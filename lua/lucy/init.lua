@@ -31,7 +31,17 @@ end
 local addMark = function(lineNr, filename, marks_section)
   local lineText = vim.api.nvim_buf_get_lines(0, lineNr - 1, lineNr, false)[1]
   local startCol = firstNonWhitespace(lineText)
+
+
   local endCol = string.len(lineText)
+
+  if startCol == -1 then
+    marks_section[lineNr] = nil
+    return
+  end
+
+  print("start end", startCol, endCol )
+
 
   local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, lineNr - 1, startCol - 1, {end_row = lineNr - 1, end_col = endCol, hl_group='LucyLine'})
 
@@ -86,6 +96,11 @@ M.toggleMark = function()
 
     vim.api.nvim_buf_del_extmark(0, ns_id, marks_section[line_nr])
     marks_section[line_nr] = nil
+
+    -- if next(marks_section) == nil then
+    --   om.del(marks, filename)
+    -- end
+
   else
     print('adding')
     print(dump(marks))
@@ -116,12 +131,22 @@ M.drawMarks = function()
   end
 end
 
+M.clearAllMarks = function(filename)
+  local all = api.nvim_buf_get_extmarks(0, ns_id, 0, -1, {})
+  -- marks[filename]['mod_extmarks'] = {}
+  for k, v in pairs(all) do
+    vim.api.nvim_buf_del_extmark(0, ns_id, v[1])
+  end
+end
+
 -- on buf change
 M.updateMarksFromExt = function()
 
   local filename = vim.fn.expand('%')
   if marks[filename] == nil then return end
 
+  print('wwoooofa2')
+  print(filename)
   if filename == {}
     or filename == nil
     or filename == ""
@@ -133,20 +158,45 @@ M.updateMarksFromExt = function()
     return
   end
 
+  print('wwoooofa')
 
   if api.nvim_buf_get_option(0, 'modified') then
-    marks[filename]['mod_extmarks'] = vim.deepcopy(marks[filename]['ext_marks'])
+    if marks[filename]['mod_extmarks'] == nil then
+      marks[filename]['mod_extmarks'] = vim.deepcopy(marks[filename]['ext_marks'])
+      -- marks['mod_orderlist'] = vim.deepcopy(marks['orderlist'])
+      -- marks['mod_files'] = {}
+    end
+    -- marks['mod_files'][filename] = true
+
+    -- get all actual marks to mod buffer
+    local all = api.nvim_buf_get_extmarks(0, ns_id, 0, -1, {})
+    marks[filename]['mod_extmarks'] = {}
+    for k, v in pairs(all) do
+      marks[filename]['mod_extmarks'][v[2] + 1] = v[1]
+    end
+    print(dump(marks))
   else
+    -- remove file from mod lists if it is not modded anymore
     marks[filename]['mod_extmarks'] = nil
-    return
+
+    -- if marks['mod_files'] ~= nil then
+    --   marks['mod_files'][filename] = nil
+    -- end
+    -- if next(marks['mod_files']) == nil then
+    --   marks['mod_files'] = nil
+    --   marks['mod_orderlist'] = nil
+    -- end
+
+    print(' 22 updated marks state:')
+    print(dump(marks))
   end
 
-  local all = api.nvim_buf_get_extmarks(0, ns_id, 0, -1, {})
-  marks[filename]['mod_extmarks'] = {}
-  for k, v in pairs(all) do
-    marks[filename]['mod_extmarks'][v[2] + 1] = v[1]
-  end
+  print('updated marks state:')
   print(dump(marks))
+
+
+  M.clearAllMarks(filename)
+  M.drawMarks(filename)
 end
 
 
@@ -230,8 +280,17 @@ function getLastItem(tbl)
   return last
 end
 
-M.jumpToNextMark = function(backwards)
+M.jumpToNextMark = function(backwards, calling_filename, loop_count)
   local filename = vim.fn.expand('%')
+
+  if calling_filename == filename then
+    if loop_count < 2 then
+      loop_count = loop_count + 1
+    else
+      return
+    end
+  end
+
 
   print('reading marks')
   if next(marks) == nil then
@@ -249,7 +308,7 @@ M.jumpToNextMark = function(backwards)
     else
       vim.cmd('normal! gg')
     end
-    M.jumpToNextMark(backwards)
+    M.jumpToNextMark(backwards, calling_filename)
     return
   end
 
@@ -296,10 +355,16 @@ M.jumpToNextMark = function(backwards)
     else
       vim.cmd('normal! gg')
     end
-    M.jumpToNextMark(backwards)
+
+    M.jumpToNextMark(backwards, calling_filename, loop_count)
     return
   end
   vim.cmd('normal! ' .. jump .. 'G')
+end
+
+M.jump = function(backwards)
+  local filename = vim.fn.expand('%')
+  M.jumpToNextMark(backwards, filename, 0)
 end
 
 
@@ -308,8 +373,8 @@ M.setup = function()
   vim.keymap.set('n', '<leader><leader>', function() M.toggleMark() end)
   vim.keymap.set('n', '<leader>ba', function() M.listMarks() end)
   vim.keymap.set('n', '<leader>bd', function() M.readFile() end)
-  vim.keymap.set('n', '<leader>j', function() M.jumpToNextMark() end)
-  vim.keymap.set('n', '<leader>k', function() M.jumpToNextMark(true) end)
+  vim.keymap.set('n', '<leader>j', function() M.jump() end)
+  vim.keymap.set('n', '<leader>k', function() M.jump(true) end)
   config.setup()
 
   augroup('LucyAutoCmds', { clear = true })
@@ -323,7 +388,8 @@ M.setup = function()
   autocmd({"TextChanged", "TextChangedI"}, {
     group = 'LucyAutoCmds',
     callback = function()
-      swallow_output(M.updateMarksFromExt)
+      -- swallow_output(M.updateMarksFromExt)
+      M.updateMarksFromExt()
     end
   })
 
