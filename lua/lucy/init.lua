@@ -90,11 +90,18 @@ M.toggleMark = function()
   end
 end
 
-M.drawMarks = function(filename)
+M.drawMarks = function()
+  local filename = vim.fn.expand('%')
+  if next(marks) == nil then
+    M.readFile()
+  end
+
   if marks[filename] == nil then
     return
   end
 
+  print('readmarks')
+  print(dump(marks))
   local marks_section = getMarkSection(filename)
 
   for k,v in pairs(marks_section) do
@@ -105,8 +112,8 @@ end
 -- on buf change
 M.updateMarksFromExt = function()
 
-  print("updating marks")
   local filename = vim.fn.expand('%')
+  if marks[filename] == nil then return end
 
   if filename == {}
     or filename == nil
@@ -119,6 +126,7 @@ M.updateMarksFromExt = function()
     return
   end
 
+
   if api.nvim_buf_get_option(0, 'modified') then
     marks[filename]['mod_extmarks'] = vim.deepcopy(marks[filename]['ext_marks'])
   else
@@ -127,13 +135,11 @@ M.updateMarksFromExt = function()
   end
 
   local all = api.nvim_buf_get_extmarks(0, ns_id, 0, -1, {})
-  print(dump(all))
   marks[filename]['mod_extmarks'] = {}
   for k, v in pairs(all) do
     marks[filename]['mod_extmarks'][v[2] + 1] = v[1]
   end
   print(dump(marks))
-  print("done update")
 end
 
 
@@ -179,12 +185,13 @@ end
 
 M.readFile = function()
   local filename = vim.fn.expand('%')
-  if filename == nil or filename == '' then
-    return
-  end
+  -- if filename == nil or filename == '' then
+  --   return
+  -- end
 
   -- Example usage: read the JSON file "data.json"
   -- local data, error_message = readJsonFromFile(vim.fn.expand("~/code/lucy.nvim/test.json"))
+  print('readingmarks file')
   print(getMarksFile())
   local data, error_message = readJsonFromFile(getMarksFile())
   if data then
@@ -199,11 +206,28 @@ M.readFile = function()
     -- print(error_message)
   end
 
-  M.drawMarks(filename)
 end
 
 M.jumpToNextMark = function(backwards)
   local filename = vim.fn.expand('%')
+
+  if next(marks) == nil then
+    print('reading file')
+    M.readFile()
+  end
+
+  if filename == '' or filename == nil then
+    local next_file = next(marks, nil)
+    vim.cmd('e ' .. next_file)
+    if backwards then
+      vim.cmd('normal! G')
+    else
+      vim.cmd('normal! gg')
+    end
+    M.jumpToNextMark(backwards)
+    return
+  end
+
   local marks_section = getMarkSection(filename)
 
   local pos = vim.fn.getpos('.')
@@ -226,7 +250,18 @@ M.jumpToNextMark = function(backwards)
   end
   if jump == -1 then
     jump = pos[2]
-    print('max')
+    local next_file = next(marks, filename)
+    if next_file == nil then next_file = next(marks, nil) end
+    print(next_file)
+    vim.cmd('e ' .. next_file)
+
+    if backwards then
+      vim.cmd('normal! G')
+    else
+      vim.cmd('normal! gg')
+    end
+    M.jumpToNextMark(backwards)
+    return
   end
   vim.cmd('normal! ' .. jump .. 'G')
 end
@@ -244,7 +279,7 @@ M.setup = function()
   autocmd('BufReadPost', {
     group = 'LucyAutoCmds',
     callback = function()
-      M.readFile()
+      M.drawMarks()
     end
   })
 
