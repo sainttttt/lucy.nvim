@@ -6,7 +6,6 @@ local api = vim.api
 local augroup = vim.api.nvim_create_augroup   -- Create/get autocommand group
 local autocmd = vim.api.nvim_create_autocmd   -- Create autocommand
 
-
 -- local filename = ""
 
 local ns_id = vim.api.nvim_create_namespace('HighlightLineNamespace')
@@ -100,7 +99,7 @@ M.drawMarks = function()
     return
   end
 
-  print('readmarks')
+  print('draw marks')
   print(dump(marks))
   local marks_section = getMarkSection(filename)
 
@@ -191,14 +190,10 @@ M.readFile = function()
 
   -- Example usage: read the JSON file "data.json"
   -- local data, error_message = readJsonFromFile(vim.fn.expand("~/code/lucy.nvim/test.json"))
-  print('readingmarks file')
-  print(getMarksFile())
   local data, error_message = readJsonFromFile(getMarksFile())
   if data then
     marks = data
     clearModMarks(marks)
-    print('read marks')
-    print(dump(marks))
     -- print("JSON data loaded successfully:")
   else
     return
@@ -208,14 +203,35 @@ M.readFile = function()
 
 end
 
+function getPrevIndex(tbl, key)
+    local prevKey = nil
+    for k, v in pairs(tbl) do
+        if k == key then
+            return prevKey
+        end
+        prevKey = k
+    end
+    return nil  -- Key not found or first key in the table
+end
+
+function getLastItem(tbl)
+  local last = nil
+  for k, v in pairs(tbl) do
+    last = k
+  end
+  return last
+end
+
 M.jumpToNextMark = function(backwards)
   local filename = vim.fn.expand('%')
 
   if next(marks) == nil then
-    print('reading file')
     M.readFile()
   end
 
+  print(dump(marks))
+
+  -- jump to first file
   if filename == '' or filename == nil then
     local next_file = next(marks, nil)
     vim.cmd('e ' .. next_file)
@@ -229,15 +245,13 @@ M.jumpToNextMark = function(backwards)
   end
 
   local marks_section = getMarkSection(filename)
+  print("here", filename)
+  print(dump(marks_section))
 
   local pos = vim.fn.getpos('.')
   local jump = -1
 
-  print("here")
-  print(dump(marks_section))
   for k,v in pairs(marks_section) do
-    print('entry')
-    print(k,v)
     if backwards then
       if k < pos[2] and (jump == -1 or k > jump) then
         jump = k
@@ -248,11 +262,21 @@ M.jumpToNextMark = function(backwards)
       end
     end
   end
+
   if jump == -1 then
     jump = pos[2]
-    local next_file = next(marks, filename)
-    if next_file == nil then next_file = next(marks, nil) end
-    print(next_file)
+    local next_file = nil
+
+    -- find previous file in list
+    -- (seems like we have to loop to get this )
+    if backwards then
+      next_file = getPrevIndex(marks, filename) or getLastItem(marks)
+    else
+      next_file = next(marks, filename) or next(marks, nil)
+    end
+
+    print('loop next', next_file)
+
     vim.cmd('e ' .. next_file)
 
     if backwards then
