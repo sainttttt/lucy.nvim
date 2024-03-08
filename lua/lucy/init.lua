@@ -7,6 +7,8 @@ local augroup = vim.api.nvim_create_augroup   -- Create/get autocommand group
 local autocmd = vim.api.nvim_create_autocmd   -- Create autocommand
 local om = require('orderedmap')
 
+local saved_hi_group = nil
+
 -- local filename = ""
 
 local ns_id = vim.api.nvim_create_namespace('HighlightLineNamespace')
@@ -17,7 +19,6 @@ function swallow_output(callback, ...)
   pcall(callback, arg)
   print = old_print
 end
-
 
 function firstNonWhitespace(str)
     for i = 1, #str do
@@ -186,7 +187,6 @@ M.updateMarksFromExt = function()
 
   end
 
-
   M.clearAllMarks(filename)
   M.drawMarks(filename)
 end
@@ -284,19 +284,21 @@ local getNextFile = function(backwards, filename)
   return next_file
 end
 
-M.jumpToNextMark = function(backwards)
+M.jumpToNextMark = function(backwards, fileJump)
   local filename = vim.fn.expand('%')
 
-  print('reading marks')
   if next(marks) == nil then
     M.readFile()
   end
 
-  print(dump(marks))
+  if next(marks) == nil then return end
 
   -- jump to first file from splash
   if filename == '' or filename == nil then
     local next_file = next(marks, nil)
+    if next_file == "orderlist" then
+      next_file = next(marks, "orderlist")
+    end
     if next_file == nil then return end
     vim.cmd('e ' .. next_file)
     if backwards then
@@ -332,6 +334,10 @@ M.jumpToNextMark = function(backwards)
     -- stay at last position if we reach the end
     jump = pos[2]
 
+    if not fileJump then
+      return
+    end
+
     -- or jump to next file
     local next_file = nil
     while next_file ~= filename do
@@ -339,15 +345,12 @@ M.jumpToNextMark = function(backwards)
         next_file = filename
       end
       next_file = getNextFile(backwards, next_file)
-      print('loop next file ' .. next_file)
 
       if next_file == nil then
         return
       end
 
       local new_marks_section = getMarkSection(next_file)
-      print('new marks section')
-      print(dump(new_marks_section))
 
       if next(new_marks_section) ~= nil then
         break
@@ -372,7 +375,7 @@ M.jumpToNextMark = function(backwards)
     local pos = vim.fn.getpos('.')
 
     if new_marks_section and new_marks_section[pos[2]] == nil then
-      M.jumpToNextMark(backwards)
+      M.jumpToNextMark(backwards, fileJump)
     end
     return
   end
@@ -381,17 +384,30 @@ end
 
 M.jump = function(backwards)
   local filename = vim.fn.expand('%')
-  M.jumpToNextMark(backwards)
+  M.jumpToNextMark(backwards, true)
 end
 
+-- Function to toggle a highlighting group
+function toggleHighlightingGroup(group)
+  local get_hi_group = api.nvim_get_hl(0, {name=group})
+  print('hi_group ', dump(get_hi_group))
+  if next(get_hi_group) ~= nil then
+    saved_hi_group = get_hi_group
+    api.nvim_set_hl(0, group, {})
+  else
+    api.nvim_set_hl(0, group, saved_hi_group)
+  end
+end
 
 
 M.setup = function()
   vim.keymap.set('n', '<leader><leader>', function() M.toggleMark() end)
   vim.keymap.set('n', '<leader>ba', function() M.listMarks() end)
   vim.keymap.set('n', '<leader>bd', function() M.readFile() end)
-  vim.keymap.set('n', '<leader>j', function() M.jump() end)
-  vim.keymap.set('n', '<leader>k', function() M.jump(true) end)
+  -- vim.keymap.set('n', '<leader>j', function() M.jump() end, {silent = true})
+  vim.keymap.set('n', '<down>', function() M.jump() end, {silent = true})
+  vim.keymap.set('n', '<up>', function() M.jump(true) end)
+  vim.keymap.set('n', '<leader>bc', function() toggleHighlightingGroup("LucyLine") end)
   config.setup()
 
   augroup('LucyAutoCmds', { clear = true })
@@ -405,8 +421,8 @@ M.setup = function()
   autocmd({"TextChanged", "TextChangedI"}, {
     group = 'LucyAutoCmds',
     callback = function()
-      -- swallow_output(M.updateMarksFromExt)
-      M.updateMarksFromExt()
+      swallow_output(M.updateMarksFromExt)
+      -- M.updateMarksFromExt()
     end
   })
 
