@@ -284,6 +284,24 @@ local getNextFile = function(backwards, filename)
   return next_file
 end
 
+local getNextMarkPos = function(current_line, marks_section, backwards)
+  local jump = -1
+
+  -- find line to jump to
+  for k,v in pairs(marks_section) do
+    if backwards then
+      if k < current_line and (jump == -1 or k > jump) then
+        jump = k
+      end
+    else
+      if k > current_line and (jump == -1 or k < jump) then
+        jump = k
+      end
+    end
+  end
+  return jump
+end
+
 M.jumpToNextMark = function(backwards, fileJump)
   local filename = vim.fn.expand('%')
 
@@ -314,23 +332,28 @@ M.jumpToNextMark = function(backwards, fileJump)
   if marks_section == nil then return end
 
   local pos = vim.fn.getpos('.')
-  local jump = -1
+  local jump = getNextMarkPos(pos[2], marks_section, backwards)
 
-  -- find line to jump to
-  for k,v in pairs(marks_section) do
-    if backwards then
-      if k < pos[2] and (jump == -1 or k > jump) then
-        jump = k
-      end
-    else
-      if k > pos[2] and (jump == -1 or k < jump) then
-        jump = k
-      end
+  -- todo: has the bug if you're one line above a block
+  if jump ~= -1 then
+    local total_lines = vim.fn.line('$')
+    local last_jump = pos[2]
+    while math.abs(jump - last_jump) == 1 do
+      last_jump = jump
+      jump = getNextMarkPos(jump, marks_section, backwards)
+
+      -- todo: this condition seems to not be necessary or
+      -- only valid for forward, should look
+      if jump > total_lines then break end
     end
-  end
+    if last_jump ~= pos[2] then
+      jump = last_jump
+    end
+    vim.cmd('normal! ' .. jump .. 'G')
+    return
 
-  -- line not found
-  if jump == -1 then
+  else
+    -- line not found
     -- stay at last position if we reach the end
     jump = pos[2]
 
@@ -377,9 +400,8 @@ M.jumpToNextMark = function(backwards, fileJump)
     if new_marks_section and new_marks_section[pos[2]] == nil then
       M.jumpToNextMark(backwards, fileJump)
     end
-    return
   end
-  vim.cmd('normal! ' .. jump .. 'G')
+
 end
 
 M.jump = function(backwards)
