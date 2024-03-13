@@ -81,12 +81,16 @@ local copyModMarks = function(marks)
 end
 
 
-M.toggleMark = function()
-  local filename = vim.fn.expand('%')
-  local pos = vim.fn.getpos('.')
-  local text = vim.fn.getline('.')
+M.toggleMark = function(line_nr)
 
-  local line_nr = pos[2]
+  local filename = vim.fn.expand('%')
+
+  -- local pos = vim.fn.getpos('.')
+  -- local text = vim.fn.getline('.')
+  -- local line_nr = pos[2]
+
+  local text = vim.api.nvim_buf_get_lines(0, line_nr - 1, line_nr, false)[1]
+
 
 
   local file_entry = {extmarks = {}}
@@ -108,7 +112,7 @@ M.toggleMark = function()
 
   else
     print('adding')
-    addMark(pos[2], filename, marks_section)
+    addMark(line_nr, filename, marks_section)
   end
 
   if not api.nvim_buf_get_option(0, 'modified') then
@@ -410,7 +414,7 @@ M.jump = function(backwards)
 end
 
 -- Function to toggle a highlighting group
-function toggleHighlightingGroup(group)
+local toggleHighlightingGroup = function(group)
   local get_hi_group = api.nvim_get_hl(0, {name=group})
   print('hi_group ', dump(get_hi_group))
   if next(get_hi_group) ~= nil then
@@ -421,9 +425,28 @@ function toggleHighlightingGroup(group)
   end
 end
 
+M.toggleMarkPress = function()
+  local vstart = vim.fn.getpos('v')[2]
+  local vend = vim.fn.getpos('.')[2]
+  if vend < vstart then
+    vend, vstart = vstart, vend -- swap
+  end
+
+  print(vstart, vend)
+
+
+  for i=vstart,vend do
+    M.toggleMark(i)
+  end
+
+  -- leave visual mode
+  api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', false, true, true), 'nx', false)
+end
+
+
 
 M.setup = function()
-  vim.keymap.set('n', '<leader><leader>', function() M.toggleMark() end)
+  vim.keymap.set({'n','x'}, '<leader><leader>', function() M.toggleMarkPress() end)
   vim.keymap.set('n', '<leader>ba', function() M.listMarks() end)
   vim.keymap.set('n', '<leader>bd', function() M.readFile() end)
   -- vim.keymap.set('n', '<leader>j', function() M.jump() end, {silent = true})
