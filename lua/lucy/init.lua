@@ -13,6 +13,10 @@ local saved_hi_group = nil
 
 local ns_id = vim.api.nvim_create_namespace('HighlightLineNamespace')
 
+local getMarksFile = function()
+  return vim.fn.stdpath("data") .. "/lucy/" .. vim.fn.getcwd():gsub('/', '_') .. ".lua"
+end
+
 function swallow_output(callback, ...)
   local old_print = print
   print = function(...) end
@@ -49,34 +53,31 @@ local addMark = function(lineNr, filename, marks_section)
   marks_section[lineNr] = extmark_id
 end
 
-local delHighlight = function(lineNr, filename)
-end
 
 local getMarkSection = function(filename)
-
-  if marks[filename] == nil then
+  if marks[getMarksFile()][filename] == nil then
     return nil
   end
 
-  local marks_section = marks[filename]['extmarks']
-  if marks[filename]['mod_extmarks'] ~= nil then
-    marks_section = marks[filename]['mod_extmarks']
+  local marks_section = marks[getMarksFile()][filename]['extmarks']
+  if marks[getMarksFile()][filename]['mod_extmarks'] ~= nil then
+    marks_section = marks[getMarksFile()][filename]['mod_extmarks']
   end
   return marks_section
 end
 
 local clearModMarks = function(marks)
-  for k,v in pairs(marks) do
-    marks[k]['mod_extmarks'] = nil
+  for k,v in pairs(marks[getMarksFile()]) do
+    marks[getMarksFile()][k]['mod_extmarks'] = nil
   end
 end
 
 local copyModMarks = function(marks)
-  for k,v in pairs(marks) do
-    if marks[k]['mod_extmarks'] ~= nil then
-      marks[k]['extmarks'] = vim.deepcopy(marks[k]['mod_extmarks'])
+  for k,v in pairs(marks[getMarksFile()]) do
+    if marks[getMarksFile()][k]['mod_extmarks'] ~= nil then
+      marks[getMarksFile()][k]['extmarks'] = vim.deepcopy(marks[getMarksFile()][k]['mod_extmarks'])
     end
-    marks[k]['mod_extmarks'] = nil
+    marks[getMarksFile()][k]['mod_extmarks'] = nil
   end
 end
 
@@ -85,18 +86,18 @@ M.toggleMark = function(line_nr)
 
   local filename = vim.fn.expand('%')
 
-  -- local pos = vim.fn.getpos('.')
-  -- local text = vim.fn.getline('.')
-  -- local line_nr = pos[2]
+  -- M.readFile()
 
   local text = vim.api.nvim_buf_get_lines(0, line_nr - 1, line_nr, false)[1]
 
-
-
   local file_entry = {extmarks = {}}
 
-  om.add(marks, filename, file_entry)
-  print("added file", dump(marks[filename]))
+  if marks[getMarksFile()] == nil then
+    marks[getMarksFile()] = {}
+  end
+
+  om.add(marks[getMarksFile()], filename, file_entry)
+  print("added file", dump(marks[getMarksFile()][filename]))
 
   local marks_section = getMarkSection(filename)
 
@@ -107,7 +108,7 @@ M.toggleMark = function(line_nr)
     marks_section[line_nr] = nil
 
     -- if next(marks_section) == nil then
-    --   om.del(marks, filename)
+    --   om.del(marks[getMarksFile()], filename)
     -- end
 
   else
@@ -121,16 +122,29 @@ M.toggleMark = function(line_nr)
 end
 
 M.drawMarks = function()
+
   local filename = vim.fn.expand('%')
-  if next(marks) == nil then
+
+  print('draw marks for: ' .. filename)
+
+  print('dump marks')
+
+  dump(marks)
+  dump(getMarksFile())
+
+  if marks[getMarksFile()] == nil or next(marks[getMarksFile()]) == nil then
     M.readFile()
+    print('read file')
+    dump(marks[getMarksFile()])
   end
 
-  if marks[filename] == nil then
+  if marks[getMarksFile()][filename] == nil then
+    print('returning')
     return
   end
 
-  print('draw marks')
+
+  print('draw marks[getMarksFile()]')
   local marks_section = getMarkSection(filename)
 
   for k,v in pairs(marks_section) do
@@ -140,7 +154,7 @@ end
 
 M.clearAllMarks = function(filename)
   local all = api.nvim_buf_get_extmarks(0, ns_id, 0, -1, {})
-  -- marks[filename]['mod_extmarks'] = {}
+  -- marks[getMarksFile()][filename]['mod_extmarks'] = {}
   for k, v in pairs(all) do
     vim.api.nvim_buf_del_extmark(0, ns_id, v[1])
   end
@@ -150,7 +164,7 @@ end
 M.updateMarksFromExt = function()
 
   local filename = vim.fn.expand('%')
-  if marks[filename] == nil then return end
+  if marks[getMarksFile()][filename] == nil then return end
 
   if filename == {}
     or filename == nil
@@ -164,29 +178,29 @@ M.updateMarksFromExt = function()
   end
 
   if api.nvim_buf_get_option(0, 'modified') then
-    if marks[filename]['mod_extmarks'] == nil then
-      marks[filename]['mod_extmarks'] = vim.deepcopy(marks[filename]['ext_marks'])
-      -- marks['mod_orderlist'] = vim.deepcopy(marks['orderlist'])
-      -- marks['mod_files'] = {}
+    if marks[getMarksFile()][filename]['mod_extmarks'] == nil then
+      marks[getMarksFile()][filename]['mod_extmarks'] = vim.deepcopy(marks[getMarksFile()][filename]['ext_marks'])
+      -- marks[getMarksFile()]['mod_orderlist'] = vim.deepcopy(marks[getMarksFile()]['orderlist'])
+      -- marks[getMarksFile()]['mod_files'] = {}
     end
-    -- marks['mod_files'][filename] = true
+    -- marks[getMarksFile()]['mod_files'][filename] = true
 
-    -- get all actual marks to mod buffer
+    -- get all actual marks[getMarksFile()] to mod buffer
     local all = api.nvim_buf_get_extmarks(0, ns_id, 0, -1, {})
-    marks[filename]['mod_extmarks'] = {}
+    marks[getMarksFile()][filename]['mod_extmarks'] = {}
     for k, v in pairs(all) do
-      marks[filename]['mod_extmarks'][v[2] + 1] = v[1]
+      marks[getMarksFile()][filename]['mod_extmarks'][v[2] + 1] = v[1]
     end
   else
     -- remove file from mod lists if it is not modded anymore
-    marks[filename]['mod_extmarks'] = nil
+    marks[getMarksFile()][filename]['mod_extmarks'] = nil
 
-    -- if marks['mod_files'] ~= nil then
-    --   marks['mod_files'][filename] = nil
+    -- if marks[getMarksFile()]['mod_files'] ~= nil then
+    --   marks[getMarksFile()]['mod_files'][filename] = nil
     -- end
-    -- if next(marks['mod_files']) == nil then
-    --   marks['mod_files'] = nil
-    --   marks['mod_orderlist'] = nil
+    -- if next(marks[getMarksFile()]['mod_files']) == nil then
+    --   marks[getMarksFile()]['mod_files'] = nil
+    --   marks[getMarksFile()]['mod_orderlist'] = nil
     -- end
 
   end
@@ -196,16 +210,14 @@ M.updateMarksFromExt = function()
 end
 
 
-local getMarksFile = function()
-  return vim.fn.stdpath("data") .. "/lucy/" .. vim.fn.getcwd():gsub('/', '_') .. ".lua"
-end
 
 M.writeFile = function()
   print('writing attempt')
-  print(dump(marks))
+  print(dump(marks[getMarksFile()]))
+  print("copy mod marks")
   copyModMarks(marks)
 
-  local serialized = serpent.dump(marks)
+  local serialized = serpent.dump(marks[getMarksFile()])
   print(serialized)
   local file = io.open(getMarksFile(), "w")
   if file then
@@ -246,7 +258,7 @@ M.readFile = function()
   -- local data, error_message = readJsonFromFile(vim.fn.expand("~/code/lucy.nvim/test.json"))
   local data, error_message = readJsonFromFile(getMarksFile())
   if data then
-    marks = data
+    marks[getMarksFile()] = data
     clearModMarks(marks)
     -- print("JSON data loaded successfully:")
   else
@@ -279,11 +291,11 @@ end
 local getNextFile = function(backwards, filename)
   local next_file  = nil
   if filename == nil or filename == "" then
-    next_file = (backwards and {om.last(marks)}
-    or {om.first(marks)})[1]
+    next_file = (backwards and {om.last(marks[getMarksFile()])}
+    or {om.first(marks[getMarksFile()])})[1]
   else
-    next_file = (backwards and {om.prev(marks, filename)}
-    or {om.next(marks, filename)})[1]
+    next_file = (backwards and {om.prev(marks[getMarksFile()], filename)}
+    or {om.next(marks[getMarksFile()], filename)})[1]
   end
   return next_file
 end
@@ -309,17 +321,15 @@ end
 M.jumpToNextMark = function(backwards, fileJump)
   local filename = vim.fn.expand('%')
 
-  if next(marks) == nil then
-    M.readFile()
-  end
+  M.readFile()
 
-  if next(marks) == nil then return end
+  if marks[getMarksFile()] == nil or next(marks[getMarksFile()]) == nil then return end
 
   -- jump to first file from splash
   if filename == '' or filename == nil then
-    local next_file = next(marks, nil)
+    local next_file = next(marks[getMarksFile()], nil)
     if next_file == "orderlist" then
-      next_file = next(marks, "orderlist")
+      next_file = next(marks[getMarksFile()], "orderlist")
     end
     if next_file == nil then return end
     vim.cmd('e ' .. next_file)
@@ -446,20 +456,21 @@ end
 
 
 M.setup = function()
-  vim.keymap.set({'n','x'}, '<leader><leader>', function() M.toggleMarkPress() end)
+  vim.keymap.set({'n','x'}, 'vv', function() M.toggleMarkPress() end)
   vim.keymap.set('n', '<leader>ba', function() M.listMarks() end)
   vim.keymap.set('n', '<leader>bd', function() M.readFile() end)
   -- vim.keymap.set('n', '<leader>j', function() M.jump() end, {silent = true})
-  vim.keymap.set('n', '<down>', function() M.jump() end, {silent = true})
-  vim.keymap.set('n', '<up>', function() M.jump(true) end)
+  vim.keymap.set('n', '<s-down>', function() M.jump() end, {silent = true})
+  vim.keymap.set('n', '<s-up>', function() M.jump(true) end)
   vim.keymap.set('n', '<leader>bc', function() toggleHighlightingGroup("LucyLine") end)
   config.setup()
 
   augroup('LucyAutoCmds', { clear = true })
-  autocmd('BufReadPost', {
+  autocmd('BufEnter', {
     group = 'LucyAutoCmds',
     callback = function()
       swallow_output(M.drawMarks)
+      -- M.drawMarks()
     end
   })
 
