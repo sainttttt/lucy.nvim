@@ -8,14 +8,67 @@ local autocmd = vim.api.nvim_create_autocmd   -- Create autocommand
 local om = require('orderedmap')
 
 local saved_hi_group = nil
+local ns_id = vim.api.nvim_create_namespace('HighlightLineNamespace')
 
 -- local filename = ""
 
-local ns_id = vim.api.nvim_create_namespace('HighlightLineNamespace')
+local cwd = nil
+
+-- Cache to use for speed up (at cost of possibly outdated results)
+local root_cache = {}
+
+-- Array of file names indicating root directory. Modify to your liking.
+local root_names = { '.git',
+                     'project.toml',
+                     ".clang-format",
+                     "pyproject.toml",
+                     "setup.py",
+                     "LICENSE",
+                     "README.md",
+                     'Makefile' }
+
+function string.starts(String,Start)
+   return string.sub(String,1,string.len(Start))==Start
+end
+
+local set_root = function()
+  -- Get directory path to start search from
+  local path = vim.api.nvim_buf_get_name(0)
+  if path == '' then
+    path = vim.loop.cwd()
+  else
+    path = vim.fs.dirname(path)
+  end
+
+  -- Try cache and resort to searching upward for root directory
+  local root = root_cache[path]
+
+  local obsidian_root =  vim.fn.expand "~/Library/Mobile Documents/iCloud~md~obsidian/"
+  if root == nil then
+    if string.starts(path, obsidian_root) then
+      root = obsidian_root
+    else
+      local root_file = vim.fs.find(root_names, { path = path, upward = true })[1]
+      if root_file == nil then
+        root = vim.loop.cwd()
+      else
+        root = vim.fs.dirname(root_file)
+        root_cache[path] = root
+      end
+    end
+  end
+
+  -- Set current directory
+  cwd = root
+end
+
 
 local getMarksFile = function()
-  return vim.fn.stdpath("data") .. "/lucy/" .. vim.fn.getcwd():gsub('/', '_') .. ".lua"
+  -- return vim.fn.stdpath("data") .. "/lucy/" .. vim.fn.getcwd():gsub('/', '_') .. ".lua"
+  if cwd == nil then return end
+  return vim.fn.stdpath("data") .. "/lucy/" .. cwd:gsub('/', '_') .. ".lua"
 end
+
 
 function swallow_output(callback, ...)
   local old_print = print
@@ -321,6 +374,10 @@ end
 M.jumpToNextMark = function(backwards, fileJump)
   local filename = vim.fn.expand('%')
 
+  if getMarksFile() == nil then
+    return
+  end
+
   M.readFile()
 
   if marks[getMarksFile()] == nil or next(marks[getMarksFile()]) == nil then return end
@@ -399,7 +456,7 @@ M.jumpToNextMark = function(backwards, fileJump)
       return
     end
 
-    print('next file', next_file)
+    -- print('next file', next_file)
 
     vim.cmd('e ' .. next_file)
     if backwards then
@@ -456,6 +513,10 @@ end
 
 
 M.setup = function()
+  -- auto group stuff for detecting the cwd
+  local cwd_augroup = vim.api.nvim_create_augroup('CwdAutoRoot', {})
+  vim.api.nvim_create_autocmd({'BufReadPost', "BufEnter", "VimEnter"} , { group = cwd_augroup, callback = set_root })
+
   vim.keymap.set({'n','x'}, 'vv', function() M.toggleMarkPress() end)
   vim.keymap.set('n', '<leader>ba', function() M.listMarks() end)
   vim.keymap.set('n', '<leader>bd', function() M.readFile() end)
