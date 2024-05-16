@@ -98,7 +98,7 @@ local addMark = function(lineNr, filename, marks_section)
     return
   end
 
-  print("start end", startCol, endCol )
+  -- print("start end", startCol, endCol )
 
 
   local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, lineNr - 1, startCol - 1, {end_row = lineNr - 1, end_col = endCol, hl_group='LucyLine'})
@@ -179,26 +179,23 @@ M.drawMarks = function()
 
   local filename = vim.fn.expand('%')
 
-  print('draw marks for: ' .. filename)
+  -- print('draw marks for: ' .. filename)
+  -- print('dump marks')
 
-  print('dump marks')
-
-  dump(marks)
-  dump(getMarksFile())
+  -- dump(marks)
+  -- dump(getMarksFile())
 
   if marks[getMarksFile()] == nil or next(marks[getMarksFile()]) == nil then
     M.readFile()
-    print('read file')
-    dump(marks[getMarksFile()])
+    -- dump(marks[getMarksFile()])
   end
 
   if marks[getMarksFile()][filename] == nil then
-    print('returning')
+    -- print('returning')
     return
   end
 
-
-  print('draw marks[getMarksFile()]')
+  -- print('draw marks[getMarksFile()]')
   local marks_section = getMarkSection(filename)
 
   for k,v in pairs(marks_section) do
@@ -218,7 +215,11 @@ end
 M.updateMarksFromExt = function()
 
   local filename = vim.fn.expand('%')
-  if marks[getMarksFile()][filename] == nil then return end
+
+  if marks[getMarksFile()] == nil
+    or marks[getMarksFile()][filename] == nil then
+    return
+  end
 
   if filename == {}
     or filename == nil
@@ -478,7 +479,7 @@ end
 
 M.jump = function(backwards)
   local filename = vim.fn.expand('%')
-  M.jumpToNextMark(backwards, true)
+  M.jumpToNextMark(backwards, false)
 end
 
 -- Function to toggle a highlighting group
@@ -500,7 +501,7 @@ M.toggleMarkPress = function()
     vend, vstart = vstart, vend -- swap
   end
 
-  print(vstart, vend)
+  -- print(vstart, vend)
 
 
   for i=vstart,vend do
