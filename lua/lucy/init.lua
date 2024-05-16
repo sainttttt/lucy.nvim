@@ -104,6 +104,7 @@ local addMark = function(lineNr, filename, marks_section)
   local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, lineNr - 1, startCol - 1, {end_row = lineNr - 1, end_col = endCol, hl_group='LucyLine'})
 
   marks_section[lineNr] = extmark_id
+  -- M.drawMarks()
 end
 
 
@@ -378,7 +379,7 @@ M.jumpToNextMark = function(backwards, fileJump)
     return
   end
 
-  M.readFile()
+  -- M.readFile()
 
   if marks[getMarksFile()] == nil or next(marks[getMarksFile()]) == nil then return end
 
@@ -531,7 +532,7 @@ M.setup = function()
     group = 'LucyAutoCmds',
     callback = function()
       swallow_output(M.drawMarks)
-      -- M.drawMarks()
+      swallow_output(M.updateMarksFromExt())
     end
   })
 
@@ -539,7 +540,6 @@ M.setup = function()
     group = 'LucyAutoCmds',
     callback = function()
       swallow_output(M.updateMarksFromExt)
-      -- M.updateMarksFromExt()
     end
   })
 
