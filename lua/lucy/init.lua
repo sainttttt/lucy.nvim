@@ -3,8 +3,8 @@ local config = require("lucy.config")
 local serpent = require("serpent")
 local marks = {}
 local api = vim.api
-local augroup = vim.api.nvim_create_augroup   -- Create/get autocommand group
-local autocmd = vim.api.nvim_create_autocmd   -- Create autocommand
+local augroup = vim.api.nvim_create_augroup -- Create/get autocommand group
+local autocmd = vim.api.nvim_create_autocmd -- Create autocommand
 local om = require('orderedmap')
 
 local saved_hi_group = nil
@@ -19,16 +19,16 @@ local root_cache = {}
 
 -- Array of file names indicating root directory. Modify to your liking.
 local root_names = { '.git',
-                     'project.toml',
-                     ".clang-format",
-                     "pyproject.toml",
-                     "setup.py",
-                     "LICENSE",
-                     "README.md",
-                     'Makefile' }
+  'project.toml',
+  ".clang-format",
+  "pyproject.toml",
+  "setup.py",
+  "LICENSE",
+  "README.md",
+  'Makefile' }
 
-function string.starts(String,Start)
-   return string.sub(String,1,string.len(Start))==Start
+function string.starts(String, Start)
+  return string.sub(String, 1, string.len(Start)) == Start
 end
 
 local set_root = function()
@@ -43,7 +43,7 @@ local set_root = function()
   -- Try cache and resort to searching upward for root directory
   local root = root_cache[path]
 
-  local obsidian_root =  vim.fn.expand "~/Library/Mobile Documents/iCloud~md~obsidian/"
+  local obsidian_root = vim.fn.expand "~/Library/Mobile Documents/iCloud~md~obsidian/"
   if root == nil then
     if string.starts(path, obsidian_root) then
       root = obsidian_root
@@ -72,18 +72,19 @@ end
 
 function swallow_output(callback, ...)
   local old_print = print
-  print = function(...) end
+  print = function(...)
+  end
   pcall(callback, arg)
   print = old_print
 end
 
 function firstNonWhitespace(str)
-    for i = 1, #str do
-        if not string.find(str:sub(i, i), "%s") then
-            return i
-        end
+  for i = 1, #str do
+    if not string.find(str:sub(i, i), "%s") then
+      return i
     end
-    return -1  -- Return -1 if no non-whitespace character is found
+  end
+  return -1 -- Return -1 if no non-whitespace character is found
 end
 
 local addMark = function(lineNr, filename, marks_section)
@@ -101,7 +102,8 @@ local addMark = function(lineNr, filename, marks_section)
   -- print("start end", startCol, endCol )
 
 
-  local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, lineNr - 1, startCol - 1, {end_row = lineNr - 1, end_col = endCol, hl_group='LucyLine'})
+  local extmark_id = vim.api.nvim_buf_set_extmark(0, ns_id, lineNr - 1, startCol - 1,
+    { end_row = lineNr - 1, end_col = endCol, hl_group = 'LucyLine' })
 
   marks_section[lineNr] = extmark_id
   -- M.drawMarks()
@@ -121,13 +123,13 @@ local getMarkSection = function(filename)
 end
 
 local clearModMarks = function(marks)
-  for k,v in pairs(marks[getMarksFile()]) do
+  for k, v in pairs(marks[getMarksFile()]) do
     marks[getMarksFile()][k]['mod_extmarks'] = nil
   end
 end
 
 local copyModMarks = function(marks)
-  for k,v in pairs(marks[getMarksFile()]) do
+  for k, v in pairs(marks[getMarksFile()]) do
     if marks[getMarksFile()][k]['mod_extmarks'] ~= nil then
       marks[getMarksFile()][k]['extmarks'] = vim.deepcopy(marks[getMarksFile()][k]['mod_extmarks'])
     end
@@ -137,14 +139,13 @@ end
 
 
 M.toggleMark = function(line_nr)
-
   local filename = vim.fn.expand('%')
 
   -- M.readFile()
 
   local text = vim.api.nvim_buf_get_lines(0, line_nr - 1, line_nr, false)[1]
 
-  local file_entry = {extmarks = {}}
+  local file_entry = { extmarks = {} }
 
   if marks[getMarksFile()] == nil then
     marks[getMarksFile()] = {}
@@ -164,7 +165,6 @@ M.toggleMark = function(line_nr)
     -- if next(marks_section) == nil then
     --   om.del(marks[getMarksFile()], filename)
     -- end
-
   else
     print('adding')
     addMark(line_nr, filename, marks_section)
@@ -176,7 +176,6 @@ M.toggleMark = function(line_nr)
 end
 
 M.drawMarks = function()
-
   local filename = vim.fn.expand('%')
 
   -- print('draw marks for: ' .. filename)
@@ -198,7 +197,7 @@ M.drawMarks = function()
   -- print('draw marks[getMarksFile()]')
   local marks_section = getMarkSection(filename)
 
-  for k,v in pairs(marks_section) do
+  for k, v in pairs(marks_section) do
     addMark(k, filename, marks_section)
   end
 end
@@ -213,21 +212,20 @@ end
 
 -- on buf change
 M.updateMarksFromExt = function()
-
   local filename = vim.fn.expand('%')
 
   if marks[getMarksFile()] == nil
-    or marks[getMarksFile()][filename] == nil then
+      or marks[getMarksFile()][filename] == nil then
     return
   end
 
   if filename == {}
-    or filename == nil
-    or filename == ""
-    or vim.bo.filetype == "term"
-    or vim.bo.filetype == ""
-    or vim.bo.filetype == "fzf"
-    or vim.bo.filetype == "Nvimtree"
+      or filename == nil
+      or filename == ""
+      or vim.bo.filetype == "term"
+      or vim.bo.filetype == ""
+      or vim.bo.filetype == "fzf"
+      or vim.bo.filetype == "Nvimtree"
   then
     return
   end
@@ -257,7 +255,6 @@ M.updateMarksFromExt = function()
     --   marks[getMarksFile()]['mod_files'] = nil
     --   marks[getMarksFile()]['mod_orderlist'] = nil
     -- end
-
   end
 
   M.clearAllMarks(filename)
@@ -286,10 +283,10 @@ end
 
 -- Function to read a JSON file
 local function readJsonFromFile(filename)
-  local file = io.open(filename, "r")  -- Open the file in read mode
+  local file = io.open(filename, "r") -- Open the file in read mode
   if file then
-    local str = file:read("*a")  -- Read the entire content of the file
-    file:close()  -- Close the file
+    local str = file:read("*a")       -- Read the entire content of the file
+    file:close()                      -- Close the file
 
     local ok, copy = serpent.load(str)
     if ok then
@@ -321,18 +318,17 @@ M.readFile = function()
     -- todo: check if file exists, silent return
     -- print(error_message)
   end
-
 end
 
 function getPrevIndex(tbl, key)
-    local prevKey = nil
-    for k, v in pairs(tbl) do
-        if k == key then
-            return prevKey
-        end
-        prevKey = k
+  local prevKey = nil
+  for k, v in pairs(tbl) do
+    if k == key then
+      return prevKey
     end
-    return nil  -- Key not found or first key in the table
+    prevKey = k
+  end
+  return nil -- Key not found or first key in the table
 end
 
 function getLastItem(tbl)
@@ -344,13 +340,13 @@ function getLastItem(tbl)
 end
 
 local getNextFile = function(backwards, filename)
-  local next_file  = nil
+  local next_file = nil
   if filename == nil or filename == "" then
-    next_file = (backwards and {om.last(marks[getMarksFile()])}
-    or {om.first(marks[getMarksFile()])})[1]
+    next_file = (backwards and { om.last(marks[getMarksFile()]) }
+      or { om.first(marks[getMarksFile()]) })[1]
   else
-    next_file = (backwards and {om.prev(marks[getMarksFile()], filename)}
-    or {om.next(marks[getMarksFile()], filename)})[1]
+    next_file = (backwards and { om.prev(marks[getMarksFile()], filename) }
+      or { om.next(marks[getMarksFile()], filename) })[1]
   end
   return next_file
 end
@@ -359,7 +355,7 @@ local getNextMarkPos = function(current_line, marks_section, backwards)
   local jump = -1
 
   -- find line to jump to
-  for k,v in pairs(marks_section) do
+  for k, v in pairs(marks_section) do
     if backwards then
       if k < current_line and (jump == -1 or k > jump) then
         jump = k
@@ -373,7 +369,9 @@ local getNextMarkPos = function(current_line, marks_section, backwards)
   return jump
 end
 
-M.jumpToNextMark = function(backwards, fileJump)
+M.jump = function(opts)
+  local backwards = opts["backwards"]
+  local fileJump = opts["fileJump"]
   local filename = vim.fn.expand('%')
 
   if getMarksFile() == nil then
@@ -397,7 +395,7 @@ M.jumpToNextMark = function(backwards, fileJump)
     else
       vim.cmd('normal! gg')
     end
-    M.jumpToNextMark(backwards)
+    M.jump({ backwards = backwards })
     return
   end
 
@@ -424,7 +422,6 @@ M.jumpToNextMark = function(backwards, fileJump)
     end
     vim.cmd('normal! ' .. jump .. 'G')
     return
-
   else
     -- line not found
     -- stay at last position if we reach the end
@@ -471,20 +468,21 @@ M.jumpToNextMark = function(backwards, fileJump)
     local pos = vim.fn.getpos('.')
 
     if new_marks_section and new_marks_section[pos[2]] == nil then
-      M.jumpToNextMark(backwards, fileJump)
+      M.jump(opts)
     end
   end
-
 end
 
-M.jump = function(backwards)
-  local filename = vim.fn.expand('%')
-  M.jumpToNextMark(backwards, false)
-end
+
+-- M.jump = function(opts)
+--   local filename = vim.fn.expand('%')
+--   M.jumpToNextMark(opts)
+-- end
+
 
 -- Function to toggle a highlighting group
 local toggleHighlightingGroup = function(group)
-  local get_hi_group = api.nvim_get_hl(0, {name=group})
+  local get_hi_group = api.nvim_get_hl(0, { name = group })
   print('hi_group ', dump(get_hi_group))
   if next(get_hi_group) ~= nil then
     saved_hi_group = get_hi_group
@@ -502,9 +500,7 @@ M.toggleMarkPress = function()
   end
 
   -- print(vstart, vend)
-
-
-  for i=vstart,vend do
+  for i = vstart, vend do
     M.toggleMark(i)
   end
 
@@ -517,15 +513,7 @@ end
 M.setup = function()
   -- auto group stuff for detecting the cwd
   local cwd_augroup = vim.api.nvim_create_augroup('CwdAutoRoot', {})
-  vim.api.nvim_create_autocmd({'BufReadPost', "BufEnter", "VimEnter"} , { group = cwd_augroup, callback = set_root })
-
-  vim.keymap.set({'n','x'}, 'vv', function() M.toggleMarkPress() end)
-  vim.keymap.set('n', '<leader>ba', function() M.listMarks() end)
-  vim.keymap.set('n', '<leader>bd', function() M.readFile() end)
-  -- vim.keymap.set('n', '<leader>j', function() M.jump() end, {silent = true})
-  vim.keymap.set('n', '<s-down>', function() M.jump() end, {silent = true})
-  vim.keymap.set('n', '<s-up>', function() M.jump(true) end)
-  vim.keymap.set('n', '<leader>bc', function() toggleHighlightingGroup("LucyLine") end)
+  vim.api.nvim_create_autocmd({ 'BufReadPost', "BufEnter", "VimEnter" }, { group = cwd_augroup, callback = set_root })
   config.setup()
 
   augroup('LucyAutoCmds', { clear = true })
@@ -537,14 +525,14 @@ M.setup = function()
     end
   })
 
-  autocmd({"TextChanged", "TextChangedI"}, {
+  autocmd({ "TextChanged", "TextChangedI" }, {
     group = 'LucyAutoCmds',
     callback = function()
       swallow_output(M.updateMarksFromExt)
     end
   })
 
-  autocmd({"BufWritePost"}, {
+  autocmd({ "BufWritePost" }, {
     group = 'LucyAutoCmds',
     callback = function()
       swallow_output(M.writeFile)
