@@ -233,10 +233,7 @@ M.updateMarksFromExt = function()
   if api.nvim_buf_get_option(0, 'modified') then
     if marks[getMarksFile()][filename]['mod_extmarks'] == nil then
       marks[getMarksFile()][filename]['mod_extmarks'] = vim.deepcopy(marks[getMarksFile()][filename]['ext_marks'])
-      -- marks[getMarksFile()]['mod_orderlist'] = vim.deepcopy(marks[getMarksFile()]['orderlist'])
-      -- marks[getMarksFile()]['mod_files'] = {}
     end
-    -- marks[getMarksFile()]['mod_files'][filename] = true
 
     -- get all actual marks[getMarksFile()] to mod buffer
     local all = api.nvim_buf_get_extmarks(0, ns_id, 0, -1, {})
@@ -247,14 +244,6 @@ M.updateMarksFromExt = function()
   else
     -- remove file from mod lists if it is not modded anymore
     marks[getMarksFile()][filename]['mod_extmarks'] = nil
-
-    -- if marks[getMarksFile()]['mod_files'] ~= nil then
-    --   marks[getMarksFile()]['mod_files'][filename] = nil
-    -- end
-    -- if next(marks[getMarksFile()]['mod_files']) == nil then
-    --   marks[getMarksFile()]['mod_files'] = nil
-    --   marks[getMarksFile()]['mod_orderlist'] = nil
-    -- end
   end
 
   M.clearAllMarks(filename)
@@ -340,6 +329,7 @@ function getLastItem(tbl)
 end
 
 local getNextFile = function(backwards, filename)
+
   local next_file = nil
   if filename == nil or filename == "" then
     next_file = (backwards and { om.last(marks[getMarksFile()]) }
@@ -368,6 +358,27 @@ local getNextMarkPos = function(current_line, marks_section, backwards)
   end
   return jump
 end
+
+
+M.fileJump = function(opts)
+  local filename = vim.fn.expand('%')
+  local backwards = opts["backwards"]
+
+  if getMarksFile() == nil then
+    return
+  end
+
+  if marks[getMarksFile()] == nil or next(marks[getMarksFile()]) == nil then return end
+
+  local next_file = nil
+  if filename == '' or filename == nil then
+    local next_file = next(marks[getMarksFile()]["orderlist"], nil)
+  else
+    next_file = getNextFile(backwards, filename)
+  end
+  vim.cmd('e ' .. next_file)
+end
+
 
 M.jump = function(opts)
   local backwards = opts["backwards"]
@@ -420,6 +431,7 @@ M.jump = function(opts)
     if last_jump ~= pos[2] then
       jump = last_jump
     end
+
     vim.cmd('normal! ' .. jump .. 'G')
     return
   else
@@ -427,9 +439,13 @@ M.jump = function(opts)
     -- stay at last position if we reach the end
     jump = pos[2]
 
+
+    -- print('here ' .. fileJump)
+
     if not fileJump then
       return
     end
+
 
     -- or jump to next file
     local next_file = nil
